@@ -30,18 +30,17 @@ class amber_api():
         data.raise_for_status()
         # print(data.text)
         self.raw_data = json.loads(data.text)['data']
-        self.static_prices = self.raw_data['staticPrices']['E1']
+        self.static_import_prices = self.raw_data['staticPrices']['E1']
+        self.static_export_prices = self.raw_data['staticPrices']['B1']
         self.prices = self.raw_data['variablePricesAndRenewables']
-        # for period in self.raw_data['variablePricesAndRenewables']:
-        #     if period['periodType'] == 'ACTUAL':
-        #         print('{}: {}, {}'.format(period['period'], round(float(period['wholesaleKWHPrice']),4), period['periodSource']))
-        # print(self.raw_data)
-        # print(self.raw_data['staticPrices'])
-        # print(self.raw_data['staticPrices'].B1.totalfixedKWHPrice)
 
     def calc_import_price(self, record):
-        return float(self.static_prices['totalfixedKWHPrice']) + \
-                float(self.static_prices['lossFactor']) * float(record['wholesaleKWHPrice'])
+        return float(self.static_import_prices['totalfixedKWHPrice']) + \
+                float(self.static_import_prices['lossFactor']) * float(record['wholesaleKWHPrice'])
+
+    def calc_export_price(self, record):
+        return float(self.static_export_prices['totalfixedKWHPrice']) - \
+                float(self.static_export_prices['lossFactor']) * float(record['wholesaleKWHPrice'])
 
     def get_5m_period(self):
         # Returns the whole contents of the 5MIN record, or None if there isn't one
@@ -52,29 +51,23 @@ class amber_api():
         return record[0]
 
     def get_30m_period(self):
+        # Returns the most recent 30 minute record.
         self.poll()
         return [record for record in self.prices if record['periodSource'] == "30MIN"][-1]
 
-    def get_5m_bid_price(self):
+    def get_5m_import_bid_price(self):
+        # Returns the real $/MWH bid used to determine the price of importing power for the current 30m period.
         d = self.get_5m_period()
         if not d:
             return None
         return self.calc_import_price(d)
 
-    def get_30m_price(self):
+    def get_30m_import_price(self):
+        # Returns the real $/MWH for importing power from the grid for the most recent 30m period.
         d = self.get_30m_period()
         if not d:
             return None
         return self.calc_import_price(d)
-
-    def get_usage_prices(self, period):
-        return float(self.raw_data['staticPrices']['E1']['totalfixedKWHPrice']) + \
-                float(self.raw_data['staticPrices']['E1']['lossFactor']) * \
-                float(self.raw_data['variablePricesAndRenewables'][period]['wholesaleKWHPrice'])
-
-    def get_export_to_grid_price(self, period):
-        pass
-        # return self.raw_data.staticPrices.B1.totalfixedKWHPrice - self.raw_data.staticPrices.B1.lossFactor * self.raw_data.variablePricesAndRenewables.[period].wholesaleKWHPrice
 
 class amber_to_mqtt():
     api_lag_allowance_s = 10 # Wait this many seconds after the period start before polling for the value
@@ -105,14 +98,12 @@ class amber_to_mqtt():
 
     def publish_values(self):
         # This pulls the latest numbers from the API and publishes them to MQTT.
-        # self.amber.poll()
-        # blah blah
-        bid = self.amber.get_5m_bid_price()
+        bid = self.amber.get_5m_import_bid_price()
         if bid is None:
-            final = self.amber.get_30m_price()
-            self.client.publish(MQTT_TOPIC_PREFIX+"/30minute_Price", final)
+            final = self.amber.get_30m_import_price()
+            self.client.publish(MQTT_TOPIC_PREFIX+"/30minute_import_price", final)
         else:
-            self.client.publish(MQTT_TOPIC_PREFIX+"/5m_Price", bid)
+            self.client.publish(MQTT_TOPIC_PREFIX+"/5m_import_price", bid)
 
     def calc_next_report_time(self):
         # Returns a time around REPORT_INTERVAL_MINUTES in the future that is divisible by REPORT_INTERVAL_MINUTES
@@ -135,7 +126,7 @@ class amber_to_mqtt():
 relay = amber_to_mqtt()
 relay.connect()
 relay.loop_forever()
-a = amber_api(POSTCODE)
-a.poll()
-print(a.get_5m_bid_price())
-print(a.get_30m_price())
+# a = amber_api(POSTCODE)
+# a.poll()
+# print(a.get_5m_import_bid_price())
+# print(a.get_30m_import_price())
