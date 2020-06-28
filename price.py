@@ -37,12 +37,12 @@ class amber_api():
     def calc_import_price(self, record):
         # Returns the price of importing power from the grid in $/kWh
         return (float(self.static_import_prices['totalfixedKWHPrice']) + \
-                float(self.static_import_prices['lossFactor']) * float(record['wholesaleKWHPrice'])/100
+                float(self.static_import_prices['lossFactor']) * float(record['wholesaleKWHPrice']))/100
 
     def calc_export_price(self, record):
         # Returns the price of exporting power to the grid in $/kWh
         return (float(self.static_export_prices['totalfixedKWHPrice']) - \
-                float(self.static_export_prices['lossFactor']) * float(record['wholesaleKWHPrice'])/100
+                float(self.static_export_prices['lossFactor']) * float(record['wholesaleKWHPrice']))/100
 
     def get_5m_period(self):
         # Returns the whole contents of the 5MIN record, or None if there isn't one
