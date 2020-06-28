@@ -55,7 +55,7 @@ class amber_api():
     def get_30m_period(self):
         # Returns the most recent 30 minute record.
         self.poll()
-        return [record for record in self.prices if record['periodSource'] == "30MIN"][-1]
+        return [record for record in self.prices if record['periodSource'] == "30MIN" and record['periodType'] == "ACTUAL"][-1]
 
     def get_5m_import_bid_price(self):
         # Returns the real $/MWH bid used to determine the price of importing power for the current 30m period.
@@ -76,7 +76,7 @@ class amber_to_mqtt():
     sleep_interval_s = 10
 
     def __init__(self, postcode=POSTCODE):
-        self.last_report_time = 0
+        self.last_final_report_time = 0
         self.amber = amber_api(postcode)
 
     def connect(self):
@@ -101,28 +101,30 @@ class amber_to_mqtt():
     def publish_values(self):
         # This pulls the latest numbers from the API and publishes them to MQTT.
         bid = self.amber.get_5m_import_bid_price()
-        if bid is None:
+        if bid is not None:
+            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", bid)
+        # TODO fix this hack. Properly work out when we should report the 30-minute-interval value.
+        if (time() - self.last_final_report_time) > 26*60:
             final = self.amber.get_30m_import_price()
             self.client.publish(MQTT_TOPIC_PREFIX+"/import/30m", final)
-        else:
-            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", bid)
+            self.last_final_report_time = time()
 
-    def calc_next_report_time(self):
-        # Returns a time around REPORT_INTERVAL_MINUTES in the future that is divisible by REPORT_INTERVAL_MINUTES
+    def calc_next_report_time(self, minute):
+        # Returns a time around minute in the future that is divisible by minute
         report_time = datetime.now()
         report_time = report_time.replace(second = self.api_lag_allowance_s, microsecond = 0)
-        report_time += timedelta(minutes = REPORT_INTERVAL_MINUTES)
-        return report_time.replace(minute = REPORT_INTERVAL_MINUTES*(round(report_time.minute/REPORT_INTERVAL_MINUTES)))
+        report_time += timedelta(minutes = minute)
+        return report_time.replace(minute = minute*(round(report_time.minute/minute)))
 
     def loop_forever(self):
         # This wakes every sleep_interval_s seconds to poll new values from the API, publish them to MQTT,
         # then goes back to sleep.
         self.publish_values()
-        self.scheduled_report_time = self.calc_next_report_time()
+        self.scheduled_report_time = self.calc_next_report_time(REPORT_INTERVAL_MINUTES)
         while True:
             while datetime.now() < self.scheduled_report_time:
                 sleep(self.sleep_interval_s)
-            self.scheduled_report_time = self.calc_next_report_time()
+            self.scheduled_report_time = self.calc_next_report_time(REPORT_INTERVAL_MINUTES)
             self.publish_values()
 
 relay = amber_to_mqtt()
