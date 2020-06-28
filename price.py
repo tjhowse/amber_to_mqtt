@@ -35,12 +35,14 @@ class amber_api():
         self.prices = self.raw_data['variablePricesAndRenewables']
 
     def calc_import_price(self, record):
-        return float(self.static_import_prices['totalfixedKWHPrice']) + \
-                float(self.static_import_prices['lossFactor']) * float(record['wholesaleKWHPrice']/100)
+        # Returns the price of importing power from the grid in $/kWh
+        return (float(self.static_import_prices['totalfixedKWHPrice']) + \
+                float(self.static_import_prices['lossFactor']) * float(record['wholesaleKWHPrice'])/100
 
     def calc_export_price(self, record):
-        return float(self.static_export_prices['totalfixedKWHPrice']) - \
-                float(self.static_export_prices['lossFactor']) * float(record['wholesaleKWHPrice']/100)
+        # Returns the price of exporting power to the grid in $/kWh
+        return (float(self.static_export_prices['totalfixedKWHPrice']) - \
+                float(self.static_export_prices['lossFactor']) * float(record['wholesaleKWHPrice'])/100
 
     def get_5m_period(self):
         # Returns the whole contents of the 5MIN record, or None if there isn't one
@@ -101,9 +103,9 @@ class amber_to_mqtt():
         bid = self.amber.get_5m_import_bid_price()
         if bid is None:
             final = self.amber.get_30m_import_price()
-            self.client.publish(MQTT_TOPIC_PREFIX+"/import/30m_price", final)
+            self.client.publish(MQTT_TOPIC_PREFIX+"/import/30m", final)
         else:
-            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_price", bid)
+            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", bid)
 
     def calc_next_report_time(self):
         # Returns a time around REPORT_INTERVAL_MINUTES in the future that is divisible by REPORT_INTERVAL_MINUTES
