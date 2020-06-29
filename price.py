@@ -58,19 +58,23 @@ class amber_api():
         self.poll()
         return [record for record in self.prices if record['periodSource'] == "30MIN" and record['periodType'] == "ACTUAL"][-1]
 
-    def get_5m_import_bid_price(self):
-        # Returns the real $/MWH bid used to determine the price of importing power for the current 30m period.
+    def get_5m_bid_prices(self):
+        # Returns the real $/kWH bid used to determine the price of importing power for the current 30m period
+        # and the export price
+        # and the raw wholesaleKWHPrice
         d = self.get_5m_period()
         if not d:
-            return None
-        return self.calc_import_price(d)
+            return (None, None, None)
+        return (self.calc_import_price(d), self.calc_export_price(d), d['wholesaleKWHPrice'])
 
-    def get_30m_import_price(self):
-        # Returns the real $/MWH for importing power from the grid for the most recent 30m period.
+    def get_30m_prices(self):
+        # Returns the real $/kWH for importing power from the grid for the most recent 30m period
+        # and the export price
+        # and the raw wholesaleKWHPrice
         d = self.get_30m_period()
         if not d:
-            return None
-        return self.calc_import_price(d)
+            return (None, None, None)
+        return (self.calc_import_price(d), self.calc_export_price(d), d['wholesaleKWHPrice'])
 
 class amber_to_mqtt():
     api_lag_allowance_s = 10 # Wait this many seconds after the period start before polling for the value
@@ -101,13 +105,17 @@ class amber_to_mqtt():
 
     def publish_5m_value(self):
         # This pulls the latest numbers from the API and publishes them to MQTT.
-        bid = self.amber.get_5m_import_bid_price()
-        if bid is not None:
-            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", bid)
+        import_price, export_price, raw = self.amber.get_5m_bid_prices()
+        if import_price is not None:
+            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", import_price)
+            self.client.publish(MQTT_TOPIC_PREFIX+"/export/5m_bid", export_price)
+            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid_raw", raw)
 
     def publish_30m_value(self):
-        final = self.amber.get_30m_import_price()
-        self.client.publish(MQTT_TOPIC_PREFIX+"/import/30m", final)
+        import_price, export_price, raw = self.amber.get_30m_prices()
+        self.client.publish(MQTT_TOPIC_PREFIX+"/import/30m", import_price)
+        self.client.publish(MQTT_TOPIC_PREFIX+"/export/30m", export_price)
+        self.client.publish(MQTT_TOPIC_PREFIX+"/import/30m_raw", raw)
 
     def calc_next_report_time(self, minutes):
         # Returns a time around minutes in the future that is divisible by minutes
