@@ -21,7 +21,7 @@ class amber_api():
         self.last_poll_time = datetime.min
 
     def poll(self, force=False):
-        # Grabs data and populates self.raw_data
+        # Grabs data and populates raw_data, static_import_prices, static_output_prices and prices.
         if ((datetime.now() - self.last_poll_time).seconds/60) < BID_INTERVAL_MINUTES and not force:
             return
         self.last_poll_time = datetime.now()
@@ -29,7 +29,6 @@ class amber_api():
         data['postcode'] = self.postcode
         data = requests.post(API_URI, data=json.dumps(data))
         data.raise_for_status()
-        # print(data.text)
         self.raw_data = json.loads(data.text)['data']
         self.static_import_prices = self.raw_data['staticPrices']['E1']
         self.static_export_prices = self.raw_data['staticPrices']['B1']
@@ -103,7 +102,7 @@ class amber_to_mqtt():
     def on_message(self, client, userdata, msg):
         print("Got message: {}".format(msg))
 
-    def publish_5m_value(self):
+    def publish_5m_values(self):
         # This pulls the latest numbers from the API and publishes them to MQTT.
         import_price, export_price, raw = self.amber.get_5m_bid_prices()
         if import_price is not None:
@@ -111,7 +110,7 @@ class amber_to_mqtt():
             self.client.publish(MQTT_TOPIC_PREFIX+"/export/5m_bid", export_price)
             self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid_raw", raw)
 
-    def publish_30m_value(self):
+    def publish_30m_values(self):
         import_price, export_price, raw = self.amber.get_30m_prices()
         self.client.publish(MQTT_TOPIC_PREFIX+"/import/30m", import_price)
         self.client.publish(MQTT_TOPIC_PREFIX+"/export/30m", export_price)
@@ -125,25 +124,25 @@ class amber_to_mqtt():
         return report_time.replace(minute = minutes*(round(report_time.minute/minutes)))
 
     def loop_forever(self):
-        # This wakes every sleep_interval_s seconds to poll new values from the API, publish them to MQTT,
-        # then goes back to sleep.
-        self.publish_5m_value()
-        self.publish_30m_value()
+        # This blocks forever, polling and reporting new values every 5/30 minutes.
+        self.publish_5m_values()
+        self.publish_30m_values()
         self.shedule_5m_report_time = self.calc_next_report_time(BID_INTERVAL_MINUTES)
         self.shedule_30m_report_time = self.calc_next_report_time(TARIFF_INTERVAL_MINUTES)
         while True:
             if datetime.now() >= self.shedule_5m_report_time:
                 self.shedule_5m_report_time = self.calc_next_report_time(BID_INTERVAL_MINUTES)
-                self.publish_5m_value()
+                self.publish_5m_values()
             if datetime.now() >= self.shedule_30m_report_time:
                 self.shedule_30m_report_time = self.calc_next_report_time(TARIFF_INTERVAL_MINUTES)
-                self.publish_30m_value()
+                self.publish_30m_values()
             sleep(self.sleep_interval_s)
 
-relay = amber_to_mqtt()
-relay.connect()
-relay.loop_forever()
-# a = amber_api(POSTCODE)
-# a.poll()
-# print(a.get_5m_import_bid_price())
-# print(a.get_30m_import_price())
+if __name__ == "__main__":
+    relay = amber_to_mqtt()
+    relay.connect()
+    relay.loop_forever()
+    # a = amber_api(POSTCODE)
+    # a.poll()
+    # print(a.get_5m_import_bid_price())
+    # print(a.get_30m_import_price())
