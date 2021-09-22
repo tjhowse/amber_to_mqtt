@@ -109,6 +109,8 @@ class amber_to_mqtt():
             self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", import_price)
             self.client.publish(MQTT_TOPIC_PREFIX+"/export/5m_bid", export_price)
             self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid_raw", raw)
+        else:
+            print("No 5m data available.")
 
     def publish_30m_values(self):
         import_price, export_price, raw = self.amber.get_30m_prices()
@@ -130,12 +132,18 @@ class amber_to_mqtt():
         self.shedule_5m_report_time = self.calc_next_report_time(BID_INTERVAL_MINUTES)
         self.shedule_30m_report_time = self.calc_next_report_time(TARIFF_INTERVAL_MINUTES)
         while True:
-            if datetime.now() >= self.shedule_5m_report_time:
-                self.shedule_5m_report_time = self.calc_next_report_time(BID_INTERVAL_MINUTES)
-                self.publish_5m_values()
-            if datetime.now() >= self.shedule_30m_report_time:
-                self.shedule_30m_report_time = self.calc_next_report_time(TARIFF_INTERVAL_MINUTES)
-                self.publish_30m_values()
+            try:
+                if datetime.now() >= self.shedule_5m_report_time:
+                    print("Time to check 5m")
+                    self.shedule_5m_report_time = self.calc_next_report_time(BID_INTERVAL_MINUTES)
+                    self.publish_5m_values()
+                if datetime.now() >= self.shedule_30m_report_time:
+                    print("Time to check 30m")
+                    self.shedule_30m_report_time = self.calc_next_report_time(TARIFF_INTERVAL_MINUTES)
+                    self.publish_30m_values()
+            except Exception as e:
+                print("Awh dang: {}".format(str(e)))
+                sleep(5)
             sleep(self.sleep_interval_s)
 
 if __name__ == "__main__":
