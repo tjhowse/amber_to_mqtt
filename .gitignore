@@ -1,1 +1,4 @@
 secrets_real.py
+.vscode
+official_package
+__pycache__
