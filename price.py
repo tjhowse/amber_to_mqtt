@@ -23,6 +23,9 @@ class amber_to_mqtt():
         configuration = amberelectric.Configuration(
             access_token = AMBER_API_KEY
         )
+        self.connect_amber()
+
+    def connect_amber(self):
         self.amber = amber_api.AmberApi.create(configuration)
 
     def connect(self):
@@ -61,11 +64,11 @@ class amber_to_mqtt():
             print("Error getting prices: {}".format(str(e)))
 
         if import_price is not None:
-            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", import_price)
-            self.client.publish(MQTT_TOPIC_PREFIX+"/export/5m_bid", export_price)
+            self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", import_price/100)
+            self.client.publish(MQTT_TOPIC_PREFIX+"/export/5m_bid", -export_price/100)
             self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid_raw", intervals[0].spot_per_kwh)
         else:
-            print("No 5m data available.")
+            raise ValueError("No 5m data available.")
 
     def loop_forever(self):
         while True:
@@ -73,6 +76,7 @@ class amber_to_mqtt():
                 self.publish_realtime_values()
             except Exception as e:
                 print("Awh dang: {}".format(str(e)))
+                self.connect_amber()
                 sleep(5)
             sleep(self.sleep_interval_s)
 
