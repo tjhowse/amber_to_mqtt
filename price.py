@@ -20,12 +20,12 @@ class amber_to_mqtt():
 
     def __init__(self, postcode=POSTCODE):
         self.last_final_report_time = 0
-        configuration = amberelectric.Configuration(
-            access_token = AMBER_API_KEY
-        )
         self.connect_amber()
 
     def connect_amber(self):
+        configuration = amberelectric.Configuration(
+            access_token = AMBER_API_KEY
+        )
         self.amber = amber_api.AmberApi.create(configuration)
 
     def connect(self):
