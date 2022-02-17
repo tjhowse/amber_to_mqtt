@@ -45,7 +45,7 @@ class amber_to_mqtt():
 
     def on_connect(self, client, userdata, flags, rc):
         print("Connected to MQTT")
-    def on_disconnect(self, client, userdata, flags, rc):
+    def on_disconnect(self, client, userdata, rc):
         print("Disconnected from MQTT")
     def on_message(self, client, userdata, msg):
         print("Got message: {}".format(msg))
