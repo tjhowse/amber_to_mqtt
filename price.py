@@ -72,18 +72,18 @@ class amber_to_mqtt():
 
     def loop_forever(self):
         while True:
-            try:
-                self.publish_realtime_values()
-            except Exception as e:
-                print("Awh dang: {}".format(str(e)))
-                self.connect_amber()
-                sleep(5)
+            self.publish_realtime_values()
             sleep(self.sleep_interval_s)
 
 if __name__ == "__main__":
-    relay = amber_to_mqtt()
-    relay.connect()
-    relay.loop_forever()
+    while True:
+        try:
+            relay = amber_to_mqtt()
+            relay.connect()
+            relay.loop_forever()
+        except Exception as e:
+            print("Whoopsie! Restarting. Error: {}".format(str(e)))
+            sleep(5)
     # a = amber_api(POSTCODE)
     # a.poll()
     # print(a.get_5m_import_bid_price())
