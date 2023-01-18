@@ -17,7 +17,7 @@ BID_INTERVAL_MINUTES = 5
 TARIFF_INTERVAL_MINUTES = 30
 class amber_to_mqtt():
     api_lag_allowance_s = 10 # Wait this many seconds after the period start before polling for the value
-    sleep_interval_s = 10
+    sleep_interval_s = 30
 
     def __init__(self, postcode=POSTCODE):
         self.last_final_report_time = 0
