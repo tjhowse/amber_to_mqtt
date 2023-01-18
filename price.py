@@ -2,6 +2,7 @@
 from time import sleep, time
 from datetime import datetime, timedelta
 import json
+import logging
 import paho.mqtt.client as mqtt
 try:
     # This hack means I don't have to risk checking my actual secrets into source control
@@ -32,7 +33,7 @@ class amber_to_mqtt():
         try:
             self.sites = self.amber.get_sites()
         except Exception as e:
-            print("Error getting sites from Amber API: {}".format(str(e)))
+            logging.error("Error getting sites from Amber API: {}".format(str(e)))
             return False
         self.client = mqtt.Client()
         self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
@@ -44,15 +45,16 @@ class amber_to_mqtt():
         return True
 
     def on_connect(self, client, userdata, flags, rc):
-        print("Connected to MQTT")
+        logging.error("Connected to MQTT")
     def on_disconnect(self, client, userdata, rc):
-        print("Disconnected from MQTT")
+        logging.error("Disconnected from MQTT")
     def on_message(self, client, userdata, msg):
-        print("Got message: {}".format(msg))
+        logging.error("Got message: {}".format(msg))
 
     def publish_realtime_values(self):
         # This pulls the latest numbers from the API and publishes them to MQTT.
         intervals = self.amber.get_current_price(self.sites[0].id, resolution = 5)
+        logging.info(intervals)
         import_price, export_price = None,None
         try:
             for interval in intervals:
@@ -61,14 +63,14 @@ class amber_to_mqtt():
                 elif interval.channel_type == amberelectric.model.channel.ChannelType.FEED_IN:
                     export_price = interval.per_kwh
         except Exception as e:
-            print("Error getting prices: {}".format(str(e)))
+            logging.error("Error getting prices: {}".format(str(e)))
 
         if import_price is not None:
             self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid", import_price/100)
             self.client.publish(MQTT_TOPIC_PREFIX+"/export/5m_bid", -export_price/100)
             self.client.publish(MQTT_TOPIC_PREFIX+"/import/5m_bid_raw", intervals[0].spot_per_kwh)
-        else:
-            raise ValueError("No 5m data available.")
+        # else:
+        #     raise ValueError("No 5m data available.")
 
     def loop_forever(self):
         while True:
@@ -76,15 +78,20 @@ class amber_to_mqtt():
             sleep(self.sleep_interval_s)
 
 if __name__ == "__main__":
-    while True:
-        try:
-            relay = amber_to_mqtt()
-            relay.connect()
-            relay.loop_forever()
-        except Exception as e:
-            print("Whoopsie! Restarting. Error: {}".format(str(e)))
-            sleep(5)
+    # Set logger to include an ISO8601 timestamp
+    logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
+    relay = amber_to_mqtt()
+    relay.connect()
+    relay.loop_forever()
+# while True:
+#     try:
+#         relay = amber_to_mqtt()
+#         relay.connect()
+#         relay.loop_forever()
+#     except Exception as e:
+#         logging.error("Whoopsie! Restarting. Error: {}".format(str(e)))
+#         sleep(5)
     # a = amber_api(POSTCODE)
     # a.poll()
-    # print(a.get_5m_import_bid_price())
-    # print(a.get_30m_import_price())
+    # logging.error(a.get_5m_import_bid_price())
+    # logging.error(a.get_30m_import_price())
